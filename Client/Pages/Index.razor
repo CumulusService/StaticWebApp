@@ -1,11 +1,10 @@
 ﻿@page "/"
-@using System.Net.Http
-@using System.Net.Http.Headers
-@using Microsoft.AspNetCore.Components
+
+@using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Forms
 
-@inject HttpClient             Http
-@inject NavigationManager      NavigationManager
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
 
 @implements IDisposable
 
@@ -13,8 +12,7 @@
 
 <div class="upload-container">
   <div class="upload-card">
-
-    @* --- FINAL STATE (after upload completes) --- *@
+    @* --- FINAL STATUS (after upload completes) --- *@
     @if (isUploadComplete)
     {
       <div class="final-status">
@@ -22,15 +20,15 @@
           <div class="status-icon">
             @if (Status.Contains("✅"))
             {
-              <!-- green check -->
-              <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <!-- Green checkmark -->
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             }
             else
             {
-              <!-- red X -->
-              <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <!-- Red X -->
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="15" y1="9" x2="9" y2="15" />
                 <line x1="9" y1="9" x2="15" y2="15" />
@@ -43,14 +41,16 @@
     }
     else
     {
-      @* --- HEADER: logo, title, user info --- *@
+      @* --- UPLOAD HEADER (logo, title, user info) --- *@
       <div class="upload-header">
         <div class="logo-container">
-          <img src="data:image/png;base64,...YOUR_LOGO_BASE64..." 
+          <!-- replace YOUR_LOGO_BASE64_HERE with your real base64 string -->
+          <img src="data:image/png;base64, YOUR_LOGO_BASE64_HERE"
                class="company-logo" alt="Company Logo" />
         </div>
         <h1 class="upload-title">Upload Your File</h1>
 
+        @* Show parsed email *@
         @if (!string.IsNullOrEmpty(Email))
         {
           <div class="user-info">
@@ -60,7 +60,7 @@
         }
       </div>
 
-      @* --- DROP / CLICK ZONE --- *@
+      @* --- DRAG/DROP OR CLICK ZONE --- *@
       <div class="upload-zone">
         <InputFile OnChange="OnFileSelected"
                    accept="*/*"
@@ -72,8 +72,8 @@
         {
           <div class="upload-placeholder">
             <div class="upload-icon-large">
-              <!-- upload cloud -->
-              <svg width="64" height="64" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" fill="none">
+              <!-- Cloud upload icon -->
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                 <polyline points="14 2 14 8 20 8" />
                 <line x1="12" y1="18" x2="12" y2="12" />
@@ -86,11 +86,11 @@
         }
         else
         {
-          @* --- FILE PREVIEW --- *@
+          @* --- FILE PREVIEW BEFORE UPLOAD --- *@
           <div class="file-preview">
             <div class="file-icon">
-              <!-- doc icon -->
-              <svg width="32" height="32" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <!-- Document icon -->
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
@@ -100,8 +100,8 @@
               <div class="file-size">@FormatFileSize(selectedFile.Size)</div>
             </div>
             <button class="remove-file" @onclick="RemoveFile">
-              <!-- X -->
-              <svg width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <!-- X icon to remove -->
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="15" />
               </svg>
@@ -110,9 +110,9 @@
         }
       </div>
 
-      @* --- UPLOAD BUTTON --- *@
+      @* --- UPLOAD BUTTON AND SPINNER --- *@
       <div class="upload-actions">
-        <button class="upload-btn @(CanUpload ? "enabled" : "disabled")"
+        <button class="upload-btn @(CanUpload ? "enabled":"disabled")"
                 @onclick="SubmitFile"
                 disabled="@(!CanUpload)">
           @if (isUploading)
@@ -122,7 +122,7 @@
           }
           else
           {
-            <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
@@ -132,20 +132,20 @@
         </button>
       </div>
 
-      @* --- STATUS MESSAGE --- *@
+      @* --- STATUS MESSAGE WHILE UPLOADING or ON ERROR --- *@
       @if (!string.IsNullOrEmpty(Status))
       {
         <div class="status-message @GetStatusClass()">
           <div class="status-icon">
             @if (Status.Contains("✅"))
             {
-              <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             }
             else if (Status.Contains("❌"))
             {
-              <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="15" y1="9" x2="9" y2="15" />
                 <line x1="9" y1="9" x2="15" y2="15" />
@@ -153,7 +153,7 @@
             }
             else
             {
-              <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -168,19 +168,16 @@
 </div>
 
 <style>
-  /* your existing CSS here… */
+  /* … your existing CSS here, untouched … */
 </style>
 
 @code {
-  // holds the two values we need to post:
-  private string Email  = "";
-  private string Token  = "";
-
-  // file + UI state
+  private string Email        = "";
+  private string Token        = "";
   private IBrowserFile? selectedFile;
   private bool isUploading;
   private bool isUploadComplete;
-  private string Status = "";
+  private string Status       = "";
 
   private bool CanUpload =>
     selectedFile != null
@@ -189,25 +186,32 @@
 
   protected override void OnInitialized()
   {
-    // 1) parse ?email=…&token=… from the query‐string
+    // Pull ?email=...&token=... out of the URL
     var uri   = new Uri(NavigationManager.Uri);
-    var query = uri.Query.TrimStart('?')
+    var parts = uri.Query
+                   .TrimStart('?')
                    .Split('&', StringSplitOptions.RemoveEmptyEntries)
                    .Select(p => p.Split('=', 2))
                    .ToDictionary(
                      kv => Uri.UnescapeDataString(kv[0]),
-                     kv => kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : ""
+                     kv => kv.Length > 1
+                           ? Uri.UnescapeDataString(kv[1])
+                           : ""
                    );
-    if (query.TryGetValue("email", out var e)) Email = e;
-    if (query.TryGetValue("token", out var t)) Token = t;
 
-    // 2) if user put token after the ‘#’ (fragment), pull that out too:
+    if (parts.TryGetValue("email", out var e))
+      Email = e;
+    if (parts.TryGetValue("token", out var t))
+      Token = t;
+
+    // Some cards put token in the fragment (#token=…)
     if (!string.IsNullOrEmpty(uri.Fragment))
     {
-      // e.g. "#token=XYZ"
-      var f = uri.Fragment.TrimStart('#').Split('=',2);
-      if (f.Length == 2 && f[0] == "token")
-        Token = Uri.UnescapeDataString(f[1]);
+      var frag = uri.Fragment
+                    .TrimStart('#')
+                    .Split('=', 2);
+      if (frag.Length == 2 && frag[0] == "token")
+        Token = Uri.UnescapeDataString(frag[1]);
     }
   }
 
@@ -229,19 +233,21 @@
 
   private string FormatFileSize(long bytes)
   {
-    var sizes = new[] { "B","KB","MB","GB" };
-    double len = bytes; int order = 0;
-    while (len >= 1024 && order < sizes.Length-1)
+    string[] sizes = { "B", "KB", "MB", "GB" };
+    double   len   = bytes;
+    int      ord   = 0;
+    while (len >= 1024 && ord < sizes.Length - 1)
     {
-      len /= 1024; order++;
+      len /= 1024;
+      ord++;
     }
-    return $"{len:0.##} {sizes[order]}";
+    return $"{len:0.##} {sizes[ord]}";
   }
 
   private string GetStatusClass() =>
     Status.Contains("✅") ? "success"
   : Status.Contains("❌") ? "error"
-  :                        "info";
+  : "info";
 
   private async Task SubmitFile()
   {
@@ -250,7 +256,6 @@
       Status = "❌ No file selected";
       return;
     }
-
     if (selectedFile.Size > 10 * 1024 * 1024)
     {
       Status = "❌ File too large. Max 10 MB.";
@@ -262,30 +267,26 @@
 
     try
     {
-      // read into memory
       using var stream = selectedFile.OpenReadStream(10 * 1024 * 1024);
       using var ms     = new MemoryStream();
       await stream.CopyToAsync(ms);
       var bytes = ms.ToArray();
 
-      // build multipart/form-data
-      var content = new MultipartFormDataContent
-      {
+      var content = new MultipartFormDataContent {
         { new ByteArrayContent(bytes), "file", selectedFile.Name },
         { new StringContent(Email),    "email" },
         { new StringContent(Token),    "token" }
       };
 
-      // POST to your Azure Function
-      var resp = await Http.PostAsync("/api/upload", content);
-      if (resp.IsSuccessStatusCode)
+      var response = await Http.PostAsync("/api/upload", content);
+      if (response.IsSuccessStatusCode)
       {
-        Status = "✅ Upload successful!";
+        Status           = "✅ Upload successful!";
         isUploadComplete = true;
       }
       else
       {
-        Status = $"❌ Error: {resp.StatusCode}";
+        Status = $"❌ Server error: {response.StatusCode}";
       }
     }
     catch (Exception ex)
