@@ -272,13 +272,28 @@
 
   private bool CanUpload => selectedFile != null && !isUploading && !isUploadComplete;
 
-  protected override void OnInitialized()
-  {
+
+@*   {
     var uri = new Uri(NavigationManager.Uri);
     var qp  = System.Web.HttpUtility.ParseQueryString(uri.Query);
     Email = qp["email"] ?? "";
     Token = qp["token"] ?? "";
-  }
+  } *@
+  protected override void OnInitialized()
+ {
+  var uri = new Uri(NavigationManager.Uri);
+   // trim leading '?' then split into key=value pairs
+   var qs = uri.Query
+    .TrimStart('?')
+    .Split('&', StringSplitOptions.RemoveEmptyEntries)
+   .Select(p => p.Split('=', 2))
+    .ToDictionary(
+      kv => Uri.UnescapeDataString(kv[0]),
+      kv => kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : ""
+    );
+   if (qs.TryGetValue("email", out var e))  Email = e;
+  if (qs.TryGetValue("token", out var t))  Token = t;
+ }
 
   private void OnFileSelected(InputFileChangeEventArgs e)
   {
