@@ -52,7 +52,7 @@ namespace Api
            byte[]? fileBytes = null;
            string? email = null;
            string? token = null;
-
+           string? messageId   = null;
            // Parse multipart/form-data
            if (req.Headers.TryGetValues("Content-Type", out var ctValues)
                && ctValues.FirstOrDefault() is string contentTypeHeader
@@ -74,30 +74,32 @@ namespace Api
                    if (!ContentDispositionHeaderValue.TryParse(section.ContentDisposition, out var disposition))
                        continue;
 
-                   if (disposition.IsFileDisposition() && disposition.FileName.HasValue)
-                   {
-                       fileName = disposition.FileName.Value.Trim('"');
-                       
-                       // Try to get content type from section first, then fallback to file extension
-                       contentType = section.ContentType;
-                       if (string.IsNullOrWhiteSpace(contentType))
-                       {
-                           contentType = GetContentTypeFromFileName(fileName);
-                       }
-                       
-                       using var ms = new MemoryStream();
-                       await section.Body.CopyToAsync(ms);
-                       fileBytes = ms.ToArray();
-                   }
-                   else if (disposition.IsFormDisposition() && disposition.Name.HasValue)
-                   {
-                       var key = disposition.Name.Value.Trim('"');
-                       using var sr = new StreamReader(section.Body);
-                       var value = await sr.ReadToEndAsync();
-                       if (key.Equals("email", StringComparison.OrdinalIgnoreCase))
-                           email = value;
-                       else if (key.Equals("token", StringComparison.OrdinalIgnoreCase))
-                           token = value;
+                    if (disposition.IsFileDisposition() && disposition.FileName.HasValue)
+                    {
+                        fileName = disposition.FileName.Value.Trim('"');
+
+                        // Try to get content type from section first, then fallback to file extension
+                        contentType = section.ContentType;
+                        if (string.IsNullOrWhiteSpace(contentType))
+                        {
+                            contentType = GetContentTypeFromFileName(fileName);
+                        }
+
+                        using var ms = new MemoryStream();
+                        await section.Body.CopyToAsync(ms);
+                        fileBytes = ms.ToArray();
+                    }
+                    else if (disposition.IsFormDisposition() && disposition.Name.HasValue)
+                    {
+                        var key = disposition.Name.Value.Trim('"');
+                        using var sr = new StreamReader(section.Body);
+                        var value = await sr.ReadToEndAsync();
+                        if (key.Equals("email", StringComparison.OrdinalIgnoreCase))
+                            email = value;
+                        else if (key.Equals("token", StringComparison.OrdinalIgnoreCase))
+                            token = value;
+                        else if (key.Equals("messageid", StringComparison.OrdinalIgnoreCase))
+                            messageId = value;
                    }
                }
            }
@@ -112,34 +114,36 @@ namespace Api
                    return bad;
                }
 
-               try
-               {
-                   using var doc = JsonDocument.Parse(json);
-                   var root = doc.RootElement;
-                   if (root.TryGetProperty("fileName", out var fnProp))
-                       fileName = fnProp.GetString();
-                   if (root.TryGetProperty("contentType", out var ctProp))
-                       contentType = ctProp.GetString();
-                   if (root.TryGetProperty("fileBase64", out var fbProp) && fbProp.GetString() is string fb64)
-                       fileBytes = Convert.FromBase64String(fb64);
-                   if (root.TryGetProperty("email", out var eProp))
-                       email = eProp.GetString();
-                   if (root.TryGetProperty("token", out var tProp))
-                       token = tProp.GetString();
+                try
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("fileName", out var fnProp))
+                        fileName = fnProp.GetString();
+                    if (root.TryGetProperty("contentType", out var ctProp))
+                        contentType = ctProp.GetString();
+                    if (root.TryGetProperty("fileBase64", out var fbProp) && fbProp.GetString() is string fb64)
+                        fileBytes = Convert.FromBase64String(fb64);
+                    if (root.TryGetProperty("email", out var eProp))
+                        email = eProp.GetString();
+                    if (root.TryGetProperty("token", out var tProp))
+                        token = tProp.GetString();
+                    if (root.TryGetProperty("messageId", out var midProp))
+                        messageId = midProp.GetString();
                }
-               catch (JsonException je)
-               {
-                   var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-                   bad.WriteString($"Invalid JSON: {je.Message}");
-                   return bad;
-               }
+                catch (JsonException je)
+                {
+                    var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+                    bad.WriteString($"Invalid JSON: {je.Message}");
+                    return bad;
+                }
            }
 
            // Validate parsed data
-           if (fileName == null || contentType == null || fileBytes == null || email == null || token == null)
+           if (fileName == null || contentType == null || fileBytes == null || email == null || token == null || messageId == null)
            {
                var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-               bad.WriteString("Missing one or more required fields: fileName, contentType, file, email, token.");
+               bad.WriteString("Missing one or more required fields: fileName, contentType, file, email, token, messageId.");
                return bad;
            }
 
@@ -151,7 +155,8 @@ namespace Api
                contentType,
                fileBase64 = Convert.ToBase64String(fileBytes),
                email,
-               token
+               token,
+               messageId
            };
            var flowJson = JsonSerializer.Serialize(flowPayload);
 
