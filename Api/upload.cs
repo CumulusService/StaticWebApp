@@ -53,26 +53,27 @@ namespace Api
            string? email = null;
            string? token = null;
            string? messageId   = null;
+           string? uniqueFileName   = null;
            // Parse multipart/form-data
-           if (req.Headers.TryGetValues("Content-Type", out var ctValues)
-               && ctValues.FirstOrDefault() is string contentTypeHeader
-               && contentTypeHeader.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase))
-           {
-               var mediaType = MediaTypeHeaderValue.Parse(contentTypeHeader);
-               var boundary = HeaderUtilities.RemoveQuotes(mediaType.Boundary).Value;
-               if (string.IsNullOrWhiteSpace(boundary))
-               {
-                   var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-                   bad.WriteString("Missing multipart boundary.");
-                   return bad;
-               }
+            if (req.Headers.TryGetValues("Content-Type", out var ctValues)
+                && ctValues.FirstOrDefault() is string contentTypeHeader
+                && contentTypeHeader.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase))
+            {
+                var mediaType = MediaTypeHeaderValue.Parse(contentTypeHeader);
+                var boundary = HeaderUtilities.RemoveQuotes(mediaType.Boundary).Value;
+                if (string.IsNullOrWhiteSpace(boundary))
+                {
+                    var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+                    bad.WriteString("Missing multipart boundary.");
+                    return bad;
+                }
 
-               var reader = new MultipartReader(boundary, req.Body);
-               MultipartSection? section;
-               while ((section = await reader.ReadNextSectionAsync()) != null)
-               {
-                   if (!ContentDispositionHeaderValue.TryParse(section.ContentDisposition, out var disposition))
-                       continue;
+                var reader = new MultipartReader(boundary, req.Body);
+                MultipartSection? section;
+                while ((section = await reader.ReadNextSectionAsync()) != null)
+                {
+                    if (!ContentDispositionHeaderValue.TryParse(section.ContentDisposition, out var disposition))
+                        continue;
 
                     if (disposition.IsFileDisposition() && disposition.FileName.HasValue)
                     {
@@ -100,19 +101,21 @@ namespace Api
                             token = value;
                         else if (key.Equals("messageid", StringComparison.OrdinalIgnoreCase))
                             messageId = value;
-                   }
-               }
-           }
-           else
-           {
-               // Fallback to JSON payload
-               var json = await new StreamReader(req.Body).ReadToEndAsync();
-               if (string.IsNullOrWhiteSpace(json))
-               {
-                   var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-                   bad.WriteString("Empty request body.");
-                   return bad;
-               }
+                        else if (key.Equals("uniqueFileName", StringComparison.OrdinalIgnoreCase))
+                            uniqueFileName = value;
+                    }
+                }
+            }
+            else
+            {
+                // Fallback to JSON payload
+                var json = await new StreamReader(req.Body).ReadToEndAsync();
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+                    bad.WriteString("Empty request body.");
+                    return bad;
+                }
 
                 try
                 {
@@ -130,24 +133,27 @@ namespace Api
                         token = tProp.GetString();
                     if (root.TryGetProperty("messageId", out var midProp))
                         messageId = midProp.GetString();
-               }
+                    if (root.TryGetProperty("uniqueFileName", out var ufnProp))
+                        uniqueFileName = ufnProp.GetString();
+                }
                 catch (JsonException je)
                 {
                     var bad = req.CreateResponse(HttpStatusCode.BadRequest);
                     bad.WriteString($"Invalid JSON: {je.Message}");
                     return bad;
                 }
-           }
+            }
 
            // Validate parsed data
-           if (fileName == null || contentType == null || fileBytes == null || email == null || token == null || messageId == null)
+           if (fileName == null || contentType == null || fileBytes == null || email == null || token == null || messageId == null || uniqueFileName == null)
            {
                var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-               bad.WriteString("Missing one or more required fields: fileName, contentType, file, email, token, messageId.");
+               bad.WriteString("Missing one or more required fields: fileName, contentType, file, email, token, messageId, uniqueFileName.");
                return bad;
            }
 
-           _logger.LogInformation($"Parsed upload: fileName={fileName}, contentType={contentType}, email={email}");
+           _logger.LogInformation($"Parsed upload: fileName={fileName}, contentType={contentType}, email={email}" +
+                                  $", token={(token.Length > 10 ? token.Substring(0, 10) + "..." : token)}, messageId={messageId}, uniqueFileName={uniqueFileName}, fileSize={fileBytes.Length} bytes");
 
            var flowPayload = new
            {
@@ -156,7 +162,8 @@ namespace Api
                fileBase64 = Convert.ToBase64String(fileBytes),
                email,
                token,
-               messageId
+               messageId,
+               uniqueFileName
            };
            var flowJson = JsonSerializer.Serialize(flowPayload);
 

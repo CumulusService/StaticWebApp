@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
 @implements IDisposable
+@using Microsoft.AspNetCore.Components
 
 <PageTitle>File Upload</PageTitle>
 
@@ -266,6 +267,7 @@
   private string Email = string.Empty;
   private string Token = string.Empty;
   private string MessageId = string.Empty;
+  private string uniqueFileName = string.Empty;
   private IBrowserFile? selectedFile;
   private bool isUploading;
   private bool isUploadComplete;
@@ -283,6 +285,7 @@
     Email = queryParams["email"] ?? "";
     Token = queryParams["token"] ?? "";
     MessageId = queryParams["messageid"] ?? ""; // ← Parse messageid
+    uniqueFileName = queryParams["uniqueFileName"] ?? ""; // ← Parse uniqueFileName
     // Also check URL fragments (#token=...) for additional token sources
     if (!string.IsNullOrEmpty(uri.Fragment) && string.IsNullOrEmpty(Token))
     {
@@ -303,6 +306,8 @@
         Email = fragmentParams["email"];
       if (fragmentParams.ContainsKey("messageid") && string.IsNullOrEmpty(MessageId))
         MessageId = fragmentParams["messageid"];
+      if (fragmentParams.ContainsKey("uniqueFileName") && string.IsNullOrEmpty(uniqueFileName))
+        uniqueFileName = fragmentParams["uniqueFileName"];
     }
   }
 
@@ -370,7 +375,8 @@
       content.Add(new ByteArrayContent(bytes), "file", selectedFile.Name);
       content.Add(new StringContent(Email), "email");
       content.Add(new StringContent(Token), "token");
-      content.Add(new StringContent(MessageId), "messageid");   // ← Include messageid
+      content.Add(new StringContent(MessageId), "messageid");
+      content.Add(new StringContent(uniqueFileName), "uniqueFileName");
 
       var response = await Http.PostAsync("/api/upload", content);
       
